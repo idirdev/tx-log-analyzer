@@ -1,0 +1,32 @@
+{
+  "name": "tx-log-analyzer",
+  "version": "1.0.0",
+  "description": "Analyze txAdmin logs from FiveM/RedM servers — player sessions, bans, crashes, resource performance",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "txlog": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "lint": "eslint src/"
+  },
+  "keywords": ["fivem", "redm", "txadmin", "log-analyzer", "server-management", "gta", "rdr"],
+  "author": "idirdev",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "cli-table3": "^0.6.5",
+    "glob": "^10.4.5",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.0"
+  }
+}
