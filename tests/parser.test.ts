@@ -1,41 +1,97 @@
-import { describe, it, expect } from 'vitest';
-import { parseLogLine, parseLogFile } from '../src/parser';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { LogParser } from '../src/parser/log-parser';
+import { writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
-describe('parser', () => {
-  it('parses ban action', () => {
-    const line = '[2024-08-10 14:30:22] [txAdmin] admin banned player "TestUser" (reason: cheating)';
-    const result = parseLogLine(line);
-    expect(result?.action).toBe('ban');
-    expect(result?.target).toBe('TestUser');
-    expect(result?.reason).toBe('cheating');
+describe('LogParser', () => {
+  let parser: LogParser;
+  const tmpDir = tmpdir();
+  const tmpFile = join(tmpDir, 'test-log.txt');
+
+  beforeEach(() => {
+    parser = new LogParser();
   });
-  it('parses kick action', () => {
-    const line = '[2024-08-10 15:00:01] [txAdmin] admin kicked player "User123"';
-    const result = parseLogLine(line);
-    expect(result?.action).toBe('kick');
-    expect(result?.target).toBe('User123');
+
+  afterEach(() => {
+    try { unlinkSync(tmpFile); } catch {}
   });
-  it('parses warn action', () => {
-    const line = '[2024-08-10 15:30:00] [txAdmin] admin warned player "SomePlayer" (reason: language)';
-    const result = parseLogLine(line);
-    expect(result?.action).toBe('warn');
+
+  it('parses a log file with ban action', () => {
+    const content = '[2024-08-10 14:30:22] [info] [txAdmin] "admin1" banned "TestUser" (reason: cheating)';
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].action).toBe('player.ban');
+    expect(result.entries[0].message).toContain('TestUser');
   });
-  it('returns null for non-action lines', () => {
-    expect(parseLogLine('Server started on port 3000')).toBeNull();
-    expect(parseLogLine('')).toBeNull();
+
+  it('parses a log file with kick action', () => {
+    const content = '[2024-08-10 15:00:01] [info] [txAdmin] "admin1" kicked "User123" (reason: breaking rules)';
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].action).toBe('player.kick');
   });
-  it('parses multiple lines', () => {
-    const lines = [
-      '[2024-08-10 14:30:22] [txAdmin] admin banned player "A"',
-      'some random log line',
-      '[2024-08-10 14:31:00] [txAdmin] admin kicked player "B"',
+
+  it('parses a log file with warn action', () => {
+    const content = '[2024-08-10 15:30:00] [info] [txAdmin] "admin1" warned "SomePlayer" (reason: language)';
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].action).toBe('player.warn');
+  });
+
+  it('skips lines that do not match log format', () => {
+    const content = [
+      '[2024-08-10 14:30:22] [info] [txAdmin] "admin1" banned "A" (reason: x)',
+      'some random log line without proper format',
+      '[2024-08-10 14:31:00] [info] [txAdmin] "admin1" kicked "B" (reason: y)',
     ].join('\n');
-    const results = parseLogFile(lines);
-    expect(results).toHaveLength(2);
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.entries).toHaveLength(2);
+    expect(result.parseErrors).toBe(1);
   });
+
   it('extracts timestamps', () => {
-    const line = '[2024-08-10 14:30:22] [txAdmin] admin banned player "X"';
-    const result = parseLogLine(line);
-    expect(result?.timestamp).toContain('2024-08-10');
+    const content = '[2024-08-10 14:30:22] [info] [txAdmin] "admin1" banned "X" (reason: y)';
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.entries[0].timestamp.getFullYear()).toBe(2024);
+    expect(result.entries[0].timestamp.getMonth()).toBe(7); // August is month 7 (0-indexed)
+    expect(result.entries[0].timestamp.getDate()).toBe(10);
+  });
+
+  it('provides time range in parse result', () => {
+    const content = [
+      '[2024-08-10 14:00:00] [info] Server started',
+      '[2024-08-10 16:00:00] [info] Server stopped',
+    ].join('\n');
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.timeRange.start.getTime()).toBeLessThan(result.timeRange.end.getTime());
+  });
+
+  it('reports file path and size', () => {
+    const content = '[2024-08-10 14:00:00] [info] Server started';
+    writeFileSync(tmpFile, content, 'utf-8');
+    const result = parser.parse(tmpFile);
+    expect(result.filePath).toBe(tmpFile);
+    expect(result.fileSize).toBeGreaterThan(0);
+  });
+
+  it('extracts player events from parsed entries', () => {
+    const content = [
+      '[2024-08-10 14:00:00] [info] Player "Alice" connected (id: 1, identifiers: steam:abc)',
+      '[2024-08-10 15:00:00] [info] Player "Alice" disconnected (id: 1, reason: quit)',
+    ].join('\n');
+    writeFileSync(tmpFile, content, 'utf-8');
+    parser.parse(tmpFile);
+    const playerEvents = parser.extractPlayerEvents();
+    expect(playerEvents).toHaveLength(2);
+    expect(playerEvents[0].playerName).toBe('Alice');
+    expect(playerEvents[0].action).toBe('player.join');
+    expect(playerEvents[1].action).toBe('player.leave');
   });
 });
