@@ -108,3 +108,21 @@ src/
 ## License
 
 MIT — free to use, modify, and distribute.
+
+---
+
+## 🇫🇷 Documentation en français
+
+### Description
+tx-log-analyzer est un outil CLI pour analyser les logs txAdmin des serveurs FiveM et RedM. Il parse les sessions des joueurs, les bannissements, les kicks, les crashs et les performances des ressources pour produire des rapports détaillés. Indispensable pour les administrateurs de serveurs de jeu souhaitant surveiller et auditer leur infrastructure.
+
+### Installation
+```bash
+npm install -g tx-log-analyzer
+```
+
+### Utilisation
+```bash
+tx-log-analyzer --file /chemin/vers/txAdmin.log
+```
+Consultez la documentation en anglais ci-dessus pour la liste complète des commandes, options et formats de sortie disponibles.
